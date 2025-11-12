@@ -31,7 +31,7 @@ void ThreadPool::SubmitTask(const std::string &name, Task *task) {
     delete task;
     return;
   }
-  task_queue.push_back(task);  // add new task
+  queue.push_back(task);  // add new task
   cv.notify_one();  // wake up one waiting worker thread
 }
 
@@ -39,14 +39,14 @@ void ThreadPool::run_thread() {
   while (true) {
     Task *t = nullptr;
     std::unique_lock<std::mutex> lock(queue_mutex);
-    cv.wait(lock, [&] { return done || !task_queue.empty(); });
+    cv.wait(lock, [&] { return done || !queue.empty(); });
     //TODO1: if done and no tasks left, break
-    if (done && task_queue.empty())
+    if (done && queue.empty())
       break;
     //TODO2: if no tasks left, continue
-    t = task_queue.front();
+    t = queue.front();
     //TODO3: get task from queue, remove it from queue, and run it
-    task_queue.pop_front();
+    queue.pop_front();
     //run task outside lock
     if (t) {
       t->Run();  // run user code
