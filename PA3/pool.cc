@@ -28,50 +28,57 @@ void ThreadPool::SubmitTask(const std::string &name, Task *task) {
   std::lock_guard<std::mutex> lock(mtx);
   if (done) {
     std::cout << "Cannot add task " << name << ": pool is stopping." << std::endl;
-    // If Stop() was already called, do not accept new tasks
     delete task;
     return;
   }
+  task->name = name;
+  task->running = false;
+  queue.push_back(task);
+  num_tasks_unserviced++;
   std::cout << "Added task " << name << std::endl;
-  queue.push_back(task);  // add new task
-
-  // prepare per-task done signaling
-  task_done_map[task] = false;
-  task_cv_map[task] = new std::condition_variable();
-  
-  cv.notify_one();  // wake up one worker thread
 }
 
 void ThreadPool::run_thread() {
   while (true) {
     Task *t = nullptr;
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [&] { return done || !queue.empty(); });
-    //TODO1: if done and no tasks left, break
-    if (done && queue.empty()){
-      std::cout << "Stopping thread" << std::endl;
-      break;
-    }
-    if (!queue.empty()){
-      //TODO2: if no tasks left, continue
-      t = queue.front();
-      //TODO3: get task from queue, remove it from queue, and run it
-      queue.pop_front();
+    {
+      std::lock_guard<std::mutex> lock(mtx);
+      //TODO1: if done and no tasks left, break
+      //if (done && queue.empty()){
+      //std::cout << "Stopping thread" << std::endl;
+      //return;
+      //}
+
+      // Exit if stopping and no more tasks
+      if (done && queue.empty()) {
+        break;
+      }
+      // Grab the next task if available
+      if (!queue.empty()){
+	//TODO2: if no tasks left, continue
+	t = queue.front();
+	//TODO3: get task from queue, remove it from queue, and run it
+	queue.erase(queue.begin()); // remove task
+	num_tasks_unserviced--;
+      }
     }
     //run task outside lock
     if (t) {
       std::cout << "Started task" << std::endl;
-      t->Run();  // run user code
+      t->running = true;
+      try{
+	t->Run();  // run user code
+      } catch(...) {}
+      t->running = false;
       std::cout << "Finished task" << std::endl;
-
-      // mark task as done and notify any waiting thread
-      std::lock_guard<std::mutex> lock(mtx);
-      task_done_map[t] = true;
-      task_cv_map[t]->notify_all();
-      
       delete t; //TODO4: delete task 
     }
+    else {
+      std::this_thread::yield(); // wait briefly
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
   }
+  std::cout << "Stopping thread" << std::endl;
 }
 
 // Remove Task t from queue if it's there
@@ -90,10 +97,11 @@ void ThreadPool::remove_task(Task *t) {
 
 void ThreadPool::Stop() {
   //TODO: Delete threads, but remember to wait for them to finish first
-  std::lock_guard<std::mutex> lock(mtx);
-  done = true;
+  {
+    std::lock_guard<std::mutex> lock(mtx);
+    done = true;
+  }
   std::cout << "Stopping thread pool..." << std::endl;
-  cv.notify_all();  // wake all threads so they can exit
   
   for (auto *th : threads) {
     if (th->joinable()){
@@ -104,10 +112,10 @@ void ThreadPool::Stop() {
   threads.clear();
 
   // clean up per-task condition variables
-  for (auto &[t, cv_ptr] : task_cv_map){
-    delete cv_ptr;}
-  task_cv_map.clear();
-  task_done_map.clear();
+  for (Task* t : queue) {
+    delete t;
+  }
+  queue.clear();
   
   std::cout << "All threads stopped." << std::endl;
 }
