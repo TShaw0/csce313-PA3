@@ -27,7 +27,7 @@ void ThreadPool::SubmitTask(const std::string &name, Task *task) {
   //TODO: Add task to queue, make sure to lock the queue
   std::lock_guard<std::mutex> lock(mtx);
   if (done) {
-    std::cout << "Cannot add task " << name << ": pool is stopping." << std::endl;
+    std::cout << "Cannot add task to queue" << std::endl;
     //delete task;
     return;
   }
@@ -52,9 +52,7 @@ void ThreadPool::run_thread() {
 	num_tasks_unserviced--;
 	t->running = true;
       }
-      else if (done) {
-	break; // exit if no tasks and pool is stopping
-      }
+      else if (done) break; // exit if no tasks and pool is stopping
     }
       
     if (t) {
@@ -93,6 +91,8 @@ void ThreadPool::Stop() {
     std::lock_guard<std::mutex> lock(mtx);
     done = true;
   }
+  std::cout << "Called Stop()" << std::endl;
+
   std::cout << "Stopping thread pool..." << std::endl;
   
   for (auto *th : threads) {
