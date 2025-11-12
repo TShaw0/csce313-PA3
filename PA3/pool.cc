@@ -59,18 +59,6 @@ void ThreadPool::run_thread() {
       }
     }
       
-    //if (queue.empty()){
-    //	if (done) break;
-      // Exit if stopping and no more tasks
-      //}
-      //else {
-    //	t = queue.front();
-    //	queue.erase(queue.begin());
-    //	num_tasks_unserviced--;
-    //	t->running = true;
-    //}
-    //}
-    //run task outside lock
     if (t) {
       std::cout << "Started task" << std::endl;
       try{t->Run();} catch(...) {}
@@ -80,7 +68,7 @@ void ThreadPool::run_thread() {
     }
     else {
       //if (done) break;
-      std::this_thread::yield(); // wait briefly
+      //std::this_thread::yield(); // wait briefly
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
