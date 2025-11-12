@@ -42,7 +42,9 @@ void ThreadPool::run_thread() {
   while (true) {
     Task *t = nullptr;
     {
+
       std::lock_guard<std::mutex> lock(mtx);
+
       //TODO1: if done and no tasks left, break
       if (!queue.empty()) {
 	t = queue.front();
@@ -63,7 +65,7 @@ void ThreadPool::run_thread() {
       delete t; //TODO4: delete task 
     }
     else {
-      //if (done) break;
+      if (done) break;
       std::this_thread::yield(); // wait briefly
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
