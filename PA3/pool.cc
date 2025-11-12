@@ -34,6 +34,12 @@ void ThreadPool::SubmitTask(const std::string &name, Task *task) {
   }
   std::cout << "Added task " << name << std::endl;
   queue.push_back(task);  // add new task
+
+  // prepare per-task done signaling
+  task_done_map[task] = false;
+  task_cv_map[task] = new std::condition_variable();
+  
+  cv.notify_one();  // wake up one worker thread
 }
 
 void ThreadPool::run_thread() {
@@ -56,10 +62,13 @@ void ThreadPool::run_thread() {
       std::cout << "Started task" << std::endl;
       t->Run();  // run user code
       std::cout << "Finished task" << std::endl;
+
+      // mark task as done and notify any waiting thread
+      std::lock_guard<std::mutex> lock(mtx);
+      task_done_map[t] = true;
+      task_cv_map[t]->notify_all();
+      
       delete t; //TODO4: delete task 
-    }
-    else {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 }
@@ -83,6 +92,7 @@ void ThreadPool::Stop() {
   std::lock_guard<std::mutex> lock(mtx);
   done = true;
   std::cout << "Stopping thread pool..." << std::endl;
+  cv.notify_all();  // wake all threads so they can exit
   
   for (auto *th : threads) {
     if (th->joinable())
@@ -90,5 +100,12 @@ void ThreadPool::Stop() {
     delete th;
   }
   threads.clear();
+
+  // clean up per-task condition variables
+  for (auto &[t, cv_ptr] : task_cv_map){
+    delete cv_ptr;}
+  task_cv_map.clear();
+  task_done_map.clear();
+  
   std::cout << "All threads stopped." << std::endl;
 }
