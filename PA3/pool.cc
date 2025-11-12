@@ -49,32 +49,39 @@ void ThreadPool::run_thread() {
       //return;
       //}
 
-      // Exit if stopping and no more tasks
-      if (done && queue.empty()) {
-        break;
-      }
-      // Grab the next task if available
-      if (!queue.empty()){
-	//TODO2: if no tasks left, continue
+      if (!queue.empty()) {
 	t = queue.front();
-	//TODO3: get task from queue, remove it from queue, and run it
-	queue.erase(queue.begin()); // remove task
+	queue.erase(queue.begin());
 	num_tasks_unserviced--;
 	t->running = true;
+      } else if (done) {
+	break; // exit if no tasks and pool is stopping
       }
     }
+      
+    //if (queue.empty()){
+    //	if (done) break;
+      // Exit if stopping and no more tasks
+      //}
+      //else {
+    //	t = queue.front();
+    //	queue.erase(queue.begin());
+    //	num_tasks_unserviced--;
+    //	t->running = true;
+    //}
+    //}
     //run task outside lock
     if (t) {
       std::cout << "Started task" << std::endl;
-      //t->running = true;
       try{t->Run();} catch(...) {}
       t->running = false;
       std::cout << "Finished task" << std::endl;
       delete t; //TODO4: delete task 
     }
     else {
+      //if (done) break;
       std::this_thread::yield(); // wait briefly
-      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
   std::cout << "Stopping thread" << std::endl;
@@ -103,9 +110,7 @@ void ThreadPool::Stop() {
   std::cout << "Stopping thread pool..." << std::endl;
   
   for (auto *th : threads) {
-    if (th->joinable()){
-      th->join();
-    }
+    if (th->joinable()) th->join();
     delete th;
   }
   threads.clear();
@@ -113,9 +118,7 @@ void ThreadPool::Stop() {
   // clean up per-task condition variables
   {
     std::lock_guard<std::mutex> lock(mtx);
-    for (Task* t : queue) {
-      delete t;
-    }
+    for (Task* t : queue) delete t;
     queue.clear();
   }
   std::cout << "All threads stopped." << std::endl;
