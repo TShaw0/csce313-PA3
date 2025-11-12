@@ -67,9 +67,7 @@ void ThreadPool::run_thread() {
     if (t) {
       std::cout << "Started task" << std::endl;
       //t->running = true;
-      try{
-	t->Run();  // run user code
-      } catch(...) {}
+      try{t->Run();} catch(...) {}
       t->running = false;
       std::cout << "Finished task" << std::endl;
       delete t; //TODO4: delete task 
