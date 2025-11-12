@@ -28,7 +28,7 @@ void ThreadPool::SubmitTask(const std::string &name, Task *task) {
   std::lock_guard<std::mutex> lock(mtx);
   if (done) {
     std::cout << "Cannot add task " << name << ": pool is stopping." << std::endl;
-    delete task;
+    //delete task;
     return;
   }
   task->name = name;
@@ -60,12 +60,13 @@ void ThreadPool::run_thread() {
 	//TODO3: get task from queue, remove it from queue, and run it
 	queue.erase(queue.begin()); // remove task
 	num_tasks_unserviced--;
+	t->running = true;
       }
     }
     //run task outside lock
     if (t) {
       std::cout << "Started task" << std::endl;
-      t->running = true;
+      //t->running = true;
       try{
 	t->Run();  // run user code
       } catch(...) {}
@@ -112,10 +113,12 @@ void ThreadPool::Stop() {
   threads.clear();
 
   // clean up per-task condition variables
-  for (Task* t : queue) {
-    delete t;
+  {
+    std::lock_guard<std::mutex> lock(mtx);
+    for (Task* t : queue) {
+      delete t;
+    }
+    queue.clear();
   }
-  queue.clear();
-  
   std::cout << "All threads stopped." << std::endl;
 }
