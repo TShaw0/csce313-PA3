@@ -45,7 +45,8 @@ void ThreadPool::SubmitTask(const std::string &name, Task *task) {
 void ThreadPool::run_thread() {
   while (true) {
     Task *t = nullptr;
-    std::lock_guard<std::mutex> lock(mtx);
+    std::unique_lock<std::mutex> lock(mtx);
+    cv.wait(lock, [&] { return done || !queue.empty(); });
     //TODO1: if done and no tasks left, break
     if (done && queue.empty()){
       std::cout << "Stopping thread" << std::endl;
@@ -95,8 +96,9 @@ void ThreadPool::Stop() {
   cv.notify_all();  // wake all threads so they can exit
   
   for (auto *th : threads) {
-    if (th->joinable())
+    if (th->joinable()){
       th->join();
+    }
     delete th;
   }
   threads.clear();
